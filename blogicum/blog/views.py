@@ -71,7 +71,7 @@ class PostCreateView(LoginRequiredMixin, CreateView):
 
     def get_success_url(self):
         return reverse(
-            'blog:profile', kwargs={'username': self.object.author.username}
+            'blog:profile', kwargs={'slug': self.object.author.username}
         )
 
     def form_valid(self, form):
@@ -118,6 +118,7 @@ class PostDetailView(DetailView):
 
 class CommentCreateView(LoginRequiredMixin, CreateView):
     publication = None
+    template_name = 'blog/comment.html'
     model = Comment
     form_class = CommentForm
 
@@ -134,9 +135,11 @@ class CommentCreateView(LoginRequiredMixin, CreateView):
         return reverse('blog:post_detail', kwargs={'pk': self.publication.pk})
 
 
-class CommentUpdateView(LoginRequiredMixin, UpdateView):
+class CommentUpdateView(OnlyAuthorMixin, LoginRequiredMixin, UpdateView):
     publication = None
     model = Comment
+    pk_url_kwarg = 'comment_id'
+    template_name = 'blog/comment.html'
     form_class = CommentForm
 
     def dispatch(self, request, *args, **kwargs):
@@ -152,8 +155,13 @@ class CommentUpdateView(LoginRequiredMixin, UpdateView):
         return reverse('blog:post_detail', kwargs={'pk': self.publication.pk})
 
 
-class CommentDeleteView(DeleteView):
+class CommentDeleteView(OnlyAuthorMixin, DeleteView):
     model = Comment
+    pk_url_kwarg = 'comment_id'
+    template_name = 'blog/comment.html'
+
+    def get_success_url(self):
+        return reverse('blog:post_detail', kwargs={'pk': self.kwargs['post_id']})
 
 
 class PostsCategoryView(SingleObjectMixin, ListView):
