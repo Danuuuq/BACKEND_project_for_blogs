@@ -33,11 +33,6 @@ MANIFEST
 *.manifest
 *.spec
 
-# Statics, html
-html
-static_dev
-static
-
 # Installer logs
 pip-log.txt
 pip-delete-this-directory.txt
@@ -151,8 +146,9 @@ dmypy.json
 
 .mypy_cache
 
-# папки со статикой и медиа
+# Папки со статикой, почтой и медиа
 media/
-
 sent_emails/
-
+html/
+static_dev/
+static/

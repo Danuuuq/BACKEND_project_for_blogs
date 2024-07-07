@@ -3,6 +3,7 @@ from django.db import models
 from django.utils import timezone
 from django.conf import settings
 from django.urls import reverse
+from django.db.models import Count
 
 User = get_user_model()
 
@@ -21,6 +22,11 @@ class PostQuerySet(models.QuerySet):
             & models.Q(category__is_published=True)
         )
 
+    def comment_count(self):
+        return self.annotate(
+            comment_count=Count('comments')
+        )
+
 
 class PostManager(models.Manager):
     def get_queryset(self):
@@ -28,6 +34,7 @@ class PostManager(models.Manager):
             PostQuerySet(self.model)
             .with_related_data()
             .published()
+            .comment_count()
         )
 
 
@@ -108,6 +115,11 @@ class Post(BaseModel):
         null=True,
         verbose_name='Категория'
     )
+    image = models.ImageField(
+        'Фотография',
+        upload_to='post_photo',
+        blank=True
+    )
 
     objects = PostQuerySet.as_manager()
     published = PostManager()
@@ -127,12 +139,12 @@ class Post(BaseModel):
 
 class Comment(models.Model):
     text = models.TextField('Комментарий')
-    created_at = models.DateTimeField(auto_now_add=True)
-    post = models.ForeignKey(
+    publication = models.ForeignKey(
         Post,
         on_delete=models.CASCADE,
-        related_name='comment',
+        related_name='comments',
     )
+    created_at = models.DateTimeField(auto_now_add=True)
     author = models.ForeignKey(User, on_delete=models.CASCADE)
 
     class Meta:

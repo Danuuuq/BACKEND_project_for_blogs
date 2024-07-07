@@ -26,6 +26,8 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'django_bootstrap5',
+    'debug_toolbar',
+    'django_cleanup.apps.CleanupConfig',
 ]
 
 MIDDLEWARE = [
@@ -36,6 +38,7 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    'debug_toolbar.middleware.DebugToolbarMiddleware',
 ]
 
 ROOT_URLCONF = 'blogicum.urls'
@@ -127,6 +130,10 @@ MAX_FIELD_LENGTH = 256
 REPRESENTATION_LENGH = 20
 POSTS_PER_PAGE = 5
 LOGIN_REDIRECT_URL = 'blog:index'
+LOGIN_URL = 'login'
+MEDIA_ROOT = BASE_DIR / 'media'
+EMAIL_BACKEND = 'django.core.mail.backends.filebased.EmailBackend'
+EMAIL_FILE_PATH = BASE_DIR / 'sent_emails'
 
 # Кастомная страница для ошибки 403:
 
