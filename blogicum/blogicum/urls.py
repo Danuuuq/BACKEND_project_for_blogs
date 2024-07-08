@@ -1,5 +1,6 @@
 from django.contrib import admin
-from django.contrib.auth.forms import UserCreationForm
+from django.contrib.auth.forms import UserCreationForm, PasswordChangeForm
+from django.contrib.auth.views import PasswordChangeView
 from django.views.generic.edit import CreateView
 from django.conf.urls.static import static
 from django.urls import include, path, reverse_lazy
@@ -18,15 +19,23 @@ urlpatterns = [
             success_url=reverse_lazy('blog:index'),
         ),
         name='registration',
+    ),
+    path(
+        'auth/password_change/',
+        PasswordChangeView.as_view(
+            template_name='registration/password_change_form.html',
+            form_class=PasswordChangeForm,
+        ),
+        name='password_change'
     )
 ]
 
-handler403 = 'core.views.access_denied'
-handler404 = 'core.views.page_not_found'
-handler500 = 'core.views.server_error'
+handler403 = 'pages.views.access_denied'
+handler404 = 'pages.views.page_not_found'
+handler500 = 'pages.views.server_error'
 
-if settings.DEBUG:
-    import debug_toolbar
-    urlpatterns += (path('__debug__/', include(debug_toolbar.urls)),)
+# if settings.DEBUG:
+#     import debug_toolbar
+#     urlpatterns += (path('__debug__/', include(debug_toolbar.urls)),)
 
 urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

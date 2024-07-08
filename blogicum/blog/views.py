@@ -1,4 +1,5 @@
 from django.contrib.auth.mixins import UserPassesTestMixin, LoginRequiredMixin
+from django.http.response import HttpResponseRedirect
 from django.shortcuts import get_object_or_404, render
 from django.conf import settings
 from django.core.paginator import Paginator
@@ -8,6 +9,7 @@ from django.views.generic import (
 from django.views.generic.detail import SingleObjectMixin
 from django.views.generic.list import MultipleObjectMixin
 from django.urls import reverse_lazy, reverse
+from django.shortcuts import redirect
 from django.contrib.auth.decorators import login_required
 
 from .models import Post, Category, User, Comment
@@ -15,9 +17,30 @@ from .forms import CommentForm, PostForm, UserForm
 
 
 class OnlyAuthorMixin(UserPassesTestMixin):
+
     def test_func(self):
         object = self.get_object()
         return object.author == self.request.user
+
+
+class AuthorAndLoginMixit(UserPassesTestMixin, LoginRequiredMixin):
+    redirect_field_name = None
+
+    def dispatch(self, request, *args, **kwargs):
+        user_test_result = self.get_test_func()()
+        if not user_test_result:
+            return self.get_login_url()
+        return super().dispatch(request, *args, **kwargs)
+
+    def handle_no_permission(self) -> HttpResponseRedirect:
+        return super().handle_no_permission()
+
+    def test_func(self):
+        object = self.get_object()
+        return object.author == self.request.user
+
+    def get_login_url(self) -> str:
+        return reverse('blog:post_detail', kwargs={'pk': self.kwargs['pk']})
 
 
 class PostsUserView(SingleObjectMixin, ListView):
@@ -79,7 +102,7 @@ class PostCreateView(LoginRequiredMixin, CreateView):
         return super().form_valid(form)
 
 
-class PostUpdateView(OnlyAuthorMixin, LoginRequiredMixin, UpdateView):
+class PostUpdateView(AuthorAndLoginMixit, UpdateView):
     model = Post
     form_class = PostForm
     template_name = 'blog/create.html'
@@ -105,7 +128,6 @@ class PostDeleteView(OnlyAuthorMixin, DeleteView):
 class PostDetailView(DetailView):
     model = Post
     template_name = 'blog/detail.html'
-    
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -169,7 +191,7 @@ class PostsCategoryView(SingleObjectMixin, ListView):
     paginate_by = 10
 
     def get(self, request, *args, **kwargs):
-        self.object = self.get_object(queryset=Category.objects.all())
+        self.object = self.get_object(queryset=Category.objects.filter(is_published=True))
         return super().get(request, *args, **kwargs)
 
     def get_context_data(self, **kwargs):

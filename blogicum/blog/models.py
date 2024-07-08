@@ -148,4 +148,4 @@ class Comment(models.Model):
     author = models.ForeignKey(User, on_delete=models.CASCADE)
 
     class Meta:
-        ordering = ('-created_at',)
+        ordering = ('created_at',)
