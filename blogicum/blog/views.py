@@ -1,4 +1,6 @@
-from django.contrib.auth.mixins import UserPassesTestMixin, LoginRequiredMixin
+from django.contrib.auth.mixins import (
+    UserPassesTestMixin, LoginRequiredMixin, PermissionRequiredMixin
+)
 from django.http.response import HttpResponseRedirect
 from django.shortcuts import get_object_or_404, render
 from django.conf import settings
@@ -11,9 +13,11 @@ from django.views.generic.list import MultipleObjectMixin
 from django.urls import reverse_lazy, reverse
 from django.shortcuts import redirect
 from django.contrib.auth.decorators import login_required
-
+from django.http import Http404
 from .models import Post, Category, User, Comment
 from .forms import CommentForm, PostForm, UserForm
+from django.utils import timezone
+from datetime import datetime
 
 
 class OnlyAuthorMixin(UserPassesTestMixin):
@@ -23,24 +27,29 @@ class OnlyAuthorMixin(UserPassesTestMixin):
         return object.author == self.request.user
 
 
-class AuthorAndLoginMixit(UserPassesTestMixin, LoginRequiredMixin):
-    redirect_field_name = None
+class PermissionUnpublishedMixin(UserPassesTestMixin):
 
-    def dispatch(self, request, *args, **kwargs):
-        user_test_result = self.get_test_func()()
-        if not user_test_result:
-            return self.get_login_url()
-        return super().dispatch(request, *args, **kwargs)
+    def test_func(self) -> bool | None:
+        object = self.get_object()
+        if not object.is_published or object.pub_date >= timezone.now() or not object.category.is_published:
+            return object.author == self.request.user
+        if object.pub_date >= timezone.now():
+            return object.author == self.request.user
+        else:
+            return True
 
     def handle_no_permission(self) -> HttpResponseRedirect:
-        return super().handle_no_permission()
+        raise Http404
+
+
+class AuthorAndLoginMixit(UserPassesTestMixin):
 
     def test_func(self):
         object = self.get_object()
         return object.author == self.request.user
 
-    def get_login_url(self) -> str:
-        return reverse('blog:post_detail', kwargs={'pk': self.kwargs['pk']})
+    def handle_no_permission(self) -> HttpResponseRedirect:
+        return redirect('blog:post_detail', pk=self.kwargs['pk'])
 
 
 class PostsUserView(SingleObjectMixin, ListView):
@@ -125,7 +134,7 @@ class PostDeleteView(OnlyAuthorMixin, DeleteView):
         return super().form_valid(form)
 
 
-class PostDetailView(DetailView):
+class PostDetailView(PermissionUnpublishedMixin, DetailView):
     model = Post
     template_name = 'blog/detail.html'
 
