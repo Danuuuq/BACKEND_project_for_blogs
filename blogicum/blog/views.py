@@ -1,23 +1,45 @@
-from django.contrib.auth.mixins import (
-    UserPassesTestMixin, LoginRequiredMixin, PermissionRequiredMixin
-)
+from django.contrib.auth.mixins import UserPassesTestMixin, LoginRequiredMixin
 from django.http.response import HttpResponseRedirect
-from django.shortcuts import get_object_or_404, render
-from django.conf import settings
-from django.core.paginator import Paginator
+from django.shortcuts import get_object_or_404
 from django.views.generic import (
     CreateView, DeleteView, DetailView, ListView, UpdateView
 )
 from django.views.generic.detail import SingleObjectMixin
-from django.views.generic.list import MultipleObjectMixin
 from django.urls import reverse_lazy, reverse
 from django.shortcuts import redirect
-from django.contrib.auth.decorators import login_required
 from django.http import Http404
+from django.utils import timezone
+
 from .models import Post, Category, User, Comment
 from .forms import CommentForm, PostForm, UserForm
-from django.utils import timezone
-from datetime import datetime
+
+
+class BaseClassComment(LoginRequiredMixin):
+    publication = None
+    model = Comment
+    form_class = CommentForm
+    template_name = 'blog/comment.html'
+
+    def dispatch(self, request, *args, **kwargs):
+        self.publication = get_object_or_404(Post, pk=kwargs['post_id'])
+        return super().dispatch(request, *args, **kwargs)
+
+    def form_valid(self, form):
+        form.instance.author = self.request.user
+        form.instance.publication = self.publication
+        return super().form_valid(form)
+
+
+class PostsAddUserAndCategoryView(SingleObjectMixin):
+    paginate_by = 10
+
+    def get_queryset(self):
+        if self.object == self.request.user:
+            return self.object.posts.comment_count().order_by('-pub_date')
+        else:
+            return self.object.posts(
+                manager='published'
+            ).all().order_by('-pub_date')
 
 
 class OnlyAuthorMixin(UserPassesTestMixin):
@@ -29,11 +51,13 @@ class OnlyAuthorMixin(UserPassesTestMixin):
 
 class PermissionUnpublishedMixin(UserPassesTestMixin):
 
-    def test_func(self) -> bool | None:
+    def test_func(self):
         object = self.get_object()
-        if not object.is_published or object.pub_date >= timezone.now() or not object.category.is_published:
-            return object.author == self.request.user
-        if object.pub_date >= timezone.now():
+        if (
+            object.pub_date >= timezone.now() or
+            not object.is_published or
+            not object.category.is_published
+        ):
             return object.author == self.request.user
         else:
             return True
@@ -42,20 +66,9 @@ class PermissionUnpublishedMixin(UserPassesTestMixin):
         raise Http404
 
 
-class AuthorAndLoginMixit(UserPassesTestMixin):
-
-    def test_func(self):
-        object = self.get_object()
-        return object.author == self.request.user
-
-    def handle_no_permission(self) -> HttpResponseRedirect:
-        return redirect('blog:post_detail', pk=self.kwargs['pk'])
-
-
-class PostsUserView(SingleObjectMixin, ListView):
+class PostsUserView(PostsAddUserAndCategoryView, ListView):
     template_name = 'blog/profile.html'
     slug_field = 'username'
-    paginate_by = 10
 
     def get(self, request, *args, **kwargs):
         self.object = self.get_object(queryset=User.objects.all())
@@ -65,14 +78,6 @@ class PostsUserView(SingleObjectMixin, ListView):
         context = super().get_context_data(**kwargs)
         context['profile'] = self.object
         return context
-
-    def get_queryset(self):
-        if self.object == self.request.user:
-            return self.object.posts.comment_count().order_by('-pub_date')
-        else:
-            return self.object.posts(
-                manager='published'
-            ).all().order_by('-pub_date')
 
 
 class ProfileUpdateView(LoginRequiredMixin, UpdateView):
@@ -111,10 +116,14 @@ class PostCreateView(LoginRequiredMixin, CreateView):
         return super().form_valid(form)
 
 
-class PostUpdateView(AuthorAndLoginMixit, UpdateView):
+class PostUpdateView(OnlyAuthorMixin, UpdateView):
     model = Post
     form_class = PostForm
     template_name = 'blog/create.html'
+    # object = Post.published.get(id=self.kwargs['pk'])
+
+    def handle_no_permission(self) -> HttpResponseRedirect:
+        return redirect('blog:post_detail', pk=self.kwargs['pk'])
 
 
 class PostDeleteView(OnlyAuthorMixin, DeleteView):
@@ -127,7 +136,6 @@ class PostDeleteView(OnlyAuthorMixin, DeleteView):
         context = super().get_context_data(**kwargs)
         instance = get_object_or_404(Post, pk=self.kwargs['pk'])
         context['form'] = PostForm(instance=instance)
-        # breakpoint()
         return context
 
     def form_valid(self, form):
@@ -147,43 +155,12 @@ class PostDetailView(PermissionUnpublishedMixin, DetailView):
         return context
 
 
-class CommentCreateView(LoginRequiredMixin, CreateView):
-    publication = None
-    template_name = 'blog/comment.html'
-    model = Comment
-    form_class = CommentForm
-
-    def dispatch(self, request, *args, **kwargs):
-        self.publication = get_object_or_404(Post, pk=kwargs['post_id'])
-        return super().dispatch(request, *args, **kwargs)
-
-    def form_valid(self, form):
-        form.instance.author = self.request.user
-        form.instance.publication = self.publication
-        return super().form_valid(form)
-
-    def get_success_url(self):
-        return reverse('blog:post_detail', kwargs={'pk': self.publication.pk})
+class CommentCreateView(BaseClassComment, CreateView):
+    pass
 
 
-class CommentUpdateView(OnlyAuthorMixin, LoginRequiredMixin, UpdateView):
-    publication = None
-    model = Comment
+class CommentUpdateView(BaseClassComment, OnlyAuthorMixin, UpdateView):
     pk_url_kwarg = 'comment_id'
-    template_name = 'blog/comment.html'
-    form_class = CommentForm
-
-    def dispatch(self, request, *args, **kwargs):
-        self.publication = get_object_or_404(Post, pk=kwargs['post_id'])
-        return super().dispatch(request, *args, **kwargs)
-
-    def form_valid(self, form):
-        form.instance.author = self.request.user
-        form.instance.publication = self.publication
-        return super().form_valid(form)
-
-    def get_success_url(self):
-        return reverse('blog:post_detail', kwargs={'pk': self.publication.pk})
 
 
 class CommentDeleteView(OnlyAuthorMixin, DeleteView):
@@ -195,20 +172,16 @@ class CommentDeleteView(OnlyAuthorMixin, DeleteView):
         return reverse('blog:post_detail', kwargs={'pk': self.kwargs['post_id']})
 
 
-class PostsCategoryView(SingleObjectMixin, ListView):
+class PostsCategoryView(PostsAddUserAndCategoryView, ListView):
     template_name = 'blog/category.html'
-    paginate_by = 10
 
     def get(self, request, *args, **kwargs):
-        self.object = self.get_object(queryset=Category.objects.filter(is_published=True))
+        self.object = self.get_object(
+            queryset=Category.objects.filter(is_published=True)
+        )
         return super().get(request, *args, **kwargs)
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context['category'] = self.object
         return context
-
-    def get_queryset(self):
-        return self.object.posts(
-            manager='published'
-        ).all().order_by('-pub_date')
