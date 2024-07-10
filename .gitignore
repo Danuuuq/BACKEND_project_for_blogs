@@ -58,9 +58,9 @@ coverage.xml
 # Django stuff:
 *.log
 local_settings.py
-# db.sqlite3
+db.sqlite3
 db.sqlite3-journal
-# db.json
+db.json
 
 # Flask stuff:
 instance/
@@ -151,4 +151,4 @@ media/
 sent_emails/
 html/
 static_dev/
-# static/
+static/
