@@ -23,7 +23,6 @@ urlpatterns = [
     path(
         'auth/password_change/',
         PasswordChangeView.as_view(
-            template_name='registration/password_change_form.html',
             form_class=PasswordChangeForm,
         ),
         name='password_change'
@@ -34,8 +33,8 @@ handler403 = 'pages.views.access_denied'
 handler404 = 'pages.views.page_not_found'
 handler500 = 'pages.views.server_error'
 
-# if settings.DEBUG:
-#     import debug_toolbar
-#     urlpatterns += (path('__debug__/', include(debug_toolbar.urls)),)
+if settings.DEBUG:
+    import debug_toolbar
+    urlpatterns += (path('__debug__/', include(debug_toolbar.urls)),)
 
 urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

@@ -1,17 +1,15 @@
-from django.contrib.auth.mixins import UserPassesTestMixin, LoginRequiredMixin
-from django.http.response import HttpResponseRedirect
-from django.shortcuts import get_object_or_404
+from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
+from django.http import Http404
+from django.shortcuts import get_object_or_404, redirect
+from django.urls import reverse_lazy, reverse
+from django.utils import timezone
 from django.views.generic import (
     CreateView, DeleteView, DetailView, ListView, UpdateView
 )
 from django.views.generic.detail import SingleObjectMixin
-from django.urls import reverse_lazy, reverse
-from django.shortcuts import redirect
-from django.http import Http404
-from django.utils import timezone
 
-from .models import Post, Category, User, Comment
 from .forms import CommentForm, PostForm, UserForm
+from .models import Category, Comment, Post, User
 
 
 class BaseClassComment(LoginRequiredMixin):
@@ -30,7 +28,7 @@ class BaseClassComment(LoginRequiredMixin):
         return super().form_valid(form)
 
 
-class PostsAddUserAndCategoryView(SingleObjectMixin):
+class AddPostsUserAndCategoryView(SingleObjectMixin):
     paginate_by = 10
 
     def get_queryset(self):
@@ -54,19 +52,19 @@ class PermissionUnpublishedMixin(UserPassesTestMixin):
     def test_func(self):
         object = self.get_object()
         if (
-            object.pub_date >= timezone.now() or
-            not object.is_published or
-            not object.category.is_published
+            object.pub_date >= timezone.now()
+            or not object.is_published
+            or not object.category.is_published
         ):
             return object.author == self.request.user
         else:
             return True
 
-    def handle_no_permission(self) -> HttpResponseRedirect:
+    def handle_no_permission(self):
         raise Http404
 
 
-class PostsUserView(PostsAddUserAndCategoryView, ListView):
+class PostsUserView(AddPostsUserAndCategoryView, ListView):
     template_name = 'blog/profile.html'
     slug_field = 'username'
 
@@ -96,10 +94,10 @@ class ProfileUpdateView(LoginRequiredMixin, UpdateView):
 
 class PostListView(ListView):
     model = Post
+    queryset = Post.published
     template_name = 'blog/index.html'
     ordering = '-pub_date'
     paginate_by = 10
-    queryset = Post.published.all()
 
 
 class PostCreateView(LoginRequiredMixin, CreateView):
@@ -117,17 +115,16 @@ class PostCreateView(LoginRequiredMixin, CreateView):
 
 
 class PostUpdateView(OnlyAuthorMixin, UpdateView):
-    model = Post
+    queryset = Post.objects.with_related_data()
     form_class = PostForm
     template_name = 'blog/create.html'
-    # object = Post.published.get(id=self.kwargs['pk'])
 
-    def handle_no_permission(self) -> HttpResponseRedirect:
+    def handle_no_permission(self):
         return redirect('blog:post_detail', pk=self.kwargs['pk'])
 
 
 class PostDeleteView(OnlyAuthorMixin, DeleteView):
-    model = Post
+    queryset = Post.objects.with_related_data()
     form_class = PostForm
     template_name = 'blog/create.html'
     success_url = reverse_lazy('blog:index')
@@ -143,7 +140,7 @@ class PostDeleteView(OnlyAuthorMixin, DeleteView):
 
 
 class PostDetailView(PermissionUnpublishedMixin, DetailView):
-    model = Post
+    queryset = Post.objects.with_related_data()
     template_name = 'blog/detail.html'
 
     def get_context_data(self, **kwargs):
@@ -169,10 +166,13 @@ class CommentDeleteView(OnlyAuthorMixin, DeleteView):
     template_name = 'blog/comment.html'
 
     def get_success_url(self):
-        return reverse('blog:post_detail', kwargs={'pk': self.kwargs['post_id']})
+        return reverse(
+            'blog:post_detail',
+            kwargs={'pk': self.kwargs['post_id']}
+        )
 
 
-class PostsCategoryView(PostsAddUserAndCategoryView, ListView):
+class PostsCategoryView(AddPostsUserAndCategoryView, ListView):
     template_name = 'blog/category.html'
 
     def get(self, request, *args, **kwargs):
