@@ -5,7 +5,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 
 SECRET_KEY = 'django-insecure-*%j!la1y6-db6y0fuflf8nkpp80zjl7hs(rm7(gp7mb08@b4#n'
 
-DEBUG = True
+DEBUG = False
 
 ALLOWED_HOSTS = [
     'localhost',
@@ -121,7 +121,7 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 MAX_FIELD_LENGTH = 256
 REPRESENTATION_LENGH = 20
-POSTS_PER_PAGE = 5
+POSTS_PER_PAGE = 10
 LOGIN_REDIRECT_URL = 'blog:index'
 LOGIN_URL = 'login'
 MEDIA_ROOT = BASE_DIR / 'media'
