@@ -31,7 +31,6 @@ class PostsUserView(AddPostsUserAndCategoryView, ListView):
 class ProfileUpdateView(LoginRequiredMixin, UpdateView):
     form_class = UserForm
     template_name = 'blog/user.html'
-    success_url = reverse_lazy('blog:index')
 
     def get_object(self):
         return self.request.user
